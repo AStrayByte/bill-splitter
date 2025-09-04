@@ -33,10 +33,7 @@ function parseReceipt() {
 }
 
 function parseReceiptText(text) {
-  const lines = text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line);
+  const lines = text.split("\n");
 
   receiptData = {
     items: [],
@@ -47,11 +44,16 @@ function parseReceiptText(text) {
   };
 
   let currentItem = null;
+  let lastItemGroup = []; // Track items from the last quantity group for modifications
   let inItemSection = false;
   let inFeesSection = false;
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+    const rawLine = lines[i];
+    const line = rawLine.trim();
+
+    // Skip empty lines
+    if (!line) continue;
 
     // Skip header info
     if (line.includes("Total") && line.includes("$") && !inFeesSection) {
@@ -67,6 +69,24 @@ function parseReceiptText(text) {
       continue;
     }
 
+    // Check for modifications BEFORE trimming (lines that start with whitespace)
+    if (
+      (currentItem || lastItemGroup.length > 0) &&
+      inItemSection &&
+      !inFeesSection &&
+      (rawLine.startsWith(" ") || rawLine.startsWith("\t"))
+    ) {
+      if (currentItem) {
+        currentItem.modifications.push(line);
+      } else if (lastItemGroup.length > 0) {
+        // Apply modification to all items in the last group
+        lastItemGroup.forEach((item) => {
+          item.modifications.push(line);
+        });
+      }
+      continue;
+    }
+
     // Check for quantity at start of line (just a number)
     if (/^\d+$/.test(line) && inItemSection && !inFeesSection) {
       // Save previous item if exists
@@ -75,30 +95,42 @@ function parseReceiptText(text) {
       }
 
       const quantity = parseInt(line);
-      const nextLine = lines[i + 1];
-      const priceLine = lines[i + 2];
+      let nextLine = lines[i + 1];
+      let priceLine = lines[i + 2];
+
+      // Handle indented item names and prices
+      if (nextLine && nextLine.startsWith("\t")) {
+        nextLine = nextLine.trim();
+      }
+      if (priceLine && priceLine.startsWith("\t")) {
+        priceLine = priceLine.trim();
+      }
 
       if (nextLine && priceLine) {
         const priceMatch = priceLine.match(/\$(\d+\.\d{2})/);
         if (priceMatch) {
-          currentItem = {
-            quantity: quantity,
-            name: nextLine,
-            price: parseFloat(priceMatch[1]),
-            modifications: [],
-          };
+          const totalPrice = parseFloat(priceMatch[1]);
+          const pricePerItem = totalPrice / quantity;
+
+          // Clear the last item group and create new individual items
+          lastItemGroup = [];
+
+          // Create individual items for each quantity
+          for (let q = 0; q < quantity; q++) {
+            const newItem = {
+              quantity: 1,
+              name: nextLine,
+              price: pricePerItem,
+              modifications: [],
+            };
+            receiptData.items.push(newItem);
+            lastItemGroup.push(newItem);
+          }
+
+          currentItem = null; // Reset current item since we've added them all
           i += 2; // Skip the name and price lines
         }
       }
-      continue;
-    }
-
-    // Check for modifications (lines that start with whitespace or special chars)
-    if (
-      currentItem &&
-      (line.startsWith(" ") || line.startsWith("\t") || line.startsWith("#"))
-    ) {
-      currentItem.modifications.push(line.trim());
       continue;
     }
 
@@ -108,6 +140,7 @@ function parseReceiptText(text) {
         receiptData.items.push(currentItem);
         currentItem = null;
       }
+      lastItemGroup = []; // Clear the last item group
       inItemSection = false;
       inFeesSection = true;
 

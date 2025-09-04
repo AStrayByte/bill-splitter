@@ -1,4 +1,70 @@
-# bill-splitter
+# 🍔 Bill Splitter
+
+Easily split your Uber Eats bills among friends! Paste your receipt and fairly divide costs including fees and discounts.
+
+## Features
+
+- ✅ Split items with quantity > 1 into separate individual items
+- ✅ Handle item modifications correctly
+- ✅ Parse fees, taxes, and discounts
+- ✅ Fair cost distribution among multiple people
+- ✅ Easy assignment of items to people
+
+## Development
+
+### Running Tests
+
+```bash
+npm install
+npm test
+```
+
+### Test Coverage
+
+The parser is thoroughly tested with unit tests that verify:
+
+- Quantity splitting (items with quantity > 1 become separate items)
+- Modification parsing (item customizations)
+- Fee and discount parsing
+- Error handling for invalid receipts
+
+### GitHub Actions
+
+Tests automatically run on:
+
+- Push to `main` or `develop` branches
+- Pull requests to `main`
+- Multiple Node.js versions (18.x, 20.x)
+
+## Usage
+
+1. Open `index.html` in your browser
+2. Paste your Uber Eats receipt in the text area
+3. Click "Parse Receipt"
+4. Assign items to people by clicking their numbers
+5. View individual totals and split costs
+
+## Example Receipt Format
+
+```
+Total	$20.75
+You saved $14.37 on this order with Uber One and promos
+
+2
+	Chicken Tikka Leg
+	$23.98
+1
+	Butter Naan
+	$1.99
+
+Subtotal	$25.97
+Delivery Fee 	$0.99
+Service Fee 	$4.16
+Tax	$1.15
+Tip	$2.86
+```
+
+The parser will automatically split the 2 Chicken Tikka Legs into separate items at $11.99 each.
 
 [Live Site Here](https://astraybyte.github.io/bill-splitter/)
 
