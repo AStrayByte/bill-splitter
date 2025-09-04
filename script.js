@@ -11,7 +11,7 @@ let people = [
   { id: 2, name: "Person 2", colorIndex: 1 },
 ];
 
-let itemAssignments = {}; // itemIndex -> personId
+let itemAssignments = {}; // itemIndex -> array of personIds
 
 function parseReceipt() {
   const input = document.querySelector(".receipt-input").value;
@@ -156,11 +156,19 @@ function renderItems() {
         ? `<div class="item-details">${item.modifications.join("<br>")}</div>`
         : "";
 
+    const assignedCount = itemAssignments[index]
+      ? itemAssignments[index].length
+      : 0;
+    const isShared = assignedCount > 1;
+    const sharedIndicator = isShared
+      ? ` <span class="shared-indicator">👥 Split ${assignedCount} ways</span>`
+      : "";
+
     itemDiv.innerHTML = `
                 <div class="item-header">
                     <span class="item-name">${item.quantity}x ${
       item.name
-    }</span>
+    }${sharedIndicator}</span>
                     <span class="item-price">$${item.price.toFixed(2)}</span>
                 </div>
                 ${modifications}
@@ -170,7 +178,10 @@ function renderItems() {
                       .map(
                         (person) => `
                         <div class="person-circle color-${person.colorIndex} ${
-                          itemAssignments[index] === person.id ? "selected" : ""
+                          itemAssignments[index] &&
+                          itemAssignments[index].includes(person.id)
+                            ? "selected"
+                            : ""
                         }" 
                              onclick="assignItem(${index}, ${person.id})">
                             ${person.id}
@@ -187,12 +198,27 @@ function renderItems() {
 }
 
 function assignItem(itemIndex, personId) {
-  if (itemAssignments[itemIndex] === personId) {
-    // Unassign if clicking the same person
-    delete itemAssignments[itemIndex];
-  } else {
-    itemAssignments[itemIndex] = personId;
+  // Initialize array if it doesn't exist
+  if (!itemAssignments[itemIndex]) {
+    itemAssignments[itemIndex] = [];
   }
+
+  const currentAssignments = itemAssignments[itemIndex];
+  const personIndex = currentAssignments.indexOf(personId);
+
+  if (personIndex > -1) {
+    // Person is already assigned, remove them
+    currentAssignments.splice(personIndex, 1);
+
+    // If no one is assigned anymore, delete the entry
+    if (currentAssignments.length === 0) {
+      delete itemAssignments[itemIndex];
+    }
+  } else {
+    // Person is not assigned, add them
+    currentAssignments.push(personId);
+  }
+
   renderItems();
   updateTotals();
 }
@@ -289,14 +315,27 @@ function updateIndividualTotals() {
   // Calculate food totals for each person
   receiptData.items.forEach((item, index) => {
     const assignedTo = itemAssignments[index];
-    if (assignedTo && personTotals[assignedTo]) {
-      personTotals[assignedTo].itemsTotal += item.price;
-      personTotals[assignedTo].items.push(item);
+    if (assignedTo && assignedTo.length > 0) {
+      // Split the item cost among all assigned people
+      const splitCost = item.price / assignedTo.length;
+      const splitItem = {
+        ...item,
+        price: splitCost,
+        isShared: assignedTo.length > 1,
+      };
+
+      assignedTo.forEach((personId) => {
+        if (personTotals[personId]) {
+          personTotals[personId].itemsTotal += splitCost;
+          personTotals[personId].items.push(splitItem);
+        }
+      });
     }
   });
 
   // Calculate proportional fees and discounts
   let html = "";
+  let totalSum = 0;
 
   Object.entries(personTotals).forEach(([personId, data]) => {
     if (data.itemsTotal > 0) {
@@ -305,22 +344,43 @@ function updateIndividualTotals() {
       const personDiscounts = totalDiscounts * proportion;
       const finalTotal = data.itemsTotal + personFees - personDiscounts;
 
+      // Add to running total
+      totalSum += finalTotal;
+
+      // Generate items list
+      const itemsHtml = data.items
+        .map(
+          (item) =>
+            `<div class="person-item ${item.isShared ? "shared-item" : ""}">
+          <span>${item.quantity}x ${item.name}${
+              item.isShared ? " (shared)" : ""
+            }</span>
+          <span>$${item.price.toFixed(2)}</span>
+        </div>`
+        )
+        .join("");
+
       html += `
                     <div class="person-total color-${data.colorIndex}">
                         <div class="person-name">${data.name}</div>
-                        <div class="breakdown-item">
-                            <span>Food Total:</span>
-                            <span>$${data.itemsTotal.toFixed(2)}</span>
+                        <div class="person-items">
+                          ${itemsHtml}
                         </div>
-                        <div class="breakdown-item">
-                            <span>Share of Fees (${(proportion * 100).toFixed(
-                              1
-                            )}%):</span>
-                            <span>$${personFees.toFixed(2)}</span>
-                        </div>
-                        <div class="breakdown-item">
-                            <span>Share of Discounts:</span>
-                            <span>-$${personDiscounts.toFixed(2)}</span>
+                        <div class="breakdown-details">
+                          <div class="breakdown-item">
+                              <span>Food Total:</span>
+                              <span>$${data.itemsTotal.toFixed(2)}</span>
+                          </div>
+                          <div class="breakdown-item">
+                              <span>Share of Fees (${(proportion * 100).toFixed(
+                                1
+                              )}%):</span>
+                              <span>$${personFees.toFixed(2)}</span>
+                          </div>
+                          <div class="breakdown-item">
+                              <span>Share of Discounts:</span>
+                              <span>-$${personDiscounts.toFixed(2)}</span>
+                          </div>
                         </div>
                         <div class="breakdown-item final-total">
                             <span>Total to Pay:</span>
@@ -337,6 +397,50 @@ function updateIndividualTotals() {
   }
 
   container.innerHTML = html;
+
+  // Update verification section
+  updateTotalsVerification(totalSum);
+
+  // Apply current toggle state
+  toggleBreakdownDetails();
+}
+
+function updateTotalsVerification(calculatedTotal) {
+  const container = document.getElementById("totals-verification");
+
+  if (!container) return;
+
+  const orderTotal = receiptData.total;
+  const difference = Math.abs(calculatedTotal - orderTotal);
+  const isMatch = difference < 0.01; // Allow for small rounding differences
+
+  let verificationHtml = "";
+
+  if (calculatedTotal > 0) {
+    verificationHtml = `
+      <div class="verification-item">
+        <span>Sum of Individual Totals:</span>
+        <span>$${calculatedTotal.toFixed(2)}</span>
+      </div>
+      <div class="verification-item">
+        <span>Order Total:</span>
+        <span>$${orderTotal.toFixed(2)}</span>
+      </div>
+      <div class="verification-item ${isMatch ? "match" : "mismatch"}">
+        <span>Status:</span>
+        <span>${isMatch ? "✅ Totals Match!" : "⚠️ Totals Don't Match"}</span>
+      </div>
+      ${
+        !isMatch
+          ? `<div class="verification-difference">Difference: $${difference.toFixed(
+              2
+            )}</div>`
+          : ""
+      }
+    `;
+  }
+
+  container.innerHTML = verificationHtml;
 }
 
 function showError(message) {
@@ -344,5 +448,26 @@ function showError(message) {
   errorDiv.innerHTML = `<div class="error">${message}</div>`;
 }
 
+function toggleBreakdownDetails() {
+  const toggle = document.getElementById("details-toggle");
+  const details = document.querySelectorAll(".breakdown-details");
+
+  details.forEach((detail) => {
+    if (toggle.checked) {
+      detail.classList.remove("hidden");
+    } else {
+      detail.classList.add("hidden");
+    }
+  });
+}
+
 // Initialize empty state
 updateTotals();
+
+// Add event listener for the toggle when DOM is loaded
+document.addEventListener("DOMContentLoaded", function () {
+  const toggle = document.getElementById("details-toggle");
+  if (toggle) {
+    toggle.addEventListener("change", toggleBreakdownDetails);
+  }
+});

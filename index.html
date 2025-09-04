@@ -50,14 +50,22 @@ $5.18
         <div class="people-section">
           <h2 class="section-title">👥 People & Totals</h2>
 
+          <div class="totals-section">
+            <div class="totals-header">
+              <h3>💰 Individual Totals</h3>
+              <label class="toggle-switch">
+                <input type="checkbox" id="details-toggle" checked />
+                <span class="slider"></span>
+                <span class="toggle-label">Show Details</span>
+              </label>
+            </div>
+            <div id="individual-totals"></div>
+            <div id="totals-verification" class="verification-section"></div>
+          </div>
+
           <div class="summary">
             <h3>📊 Order Summary</h3>
             <div id="order-summary"></div>
-          </div>
-
-          <div class="totals-section">
-            <h3>💰 Individual Totals</h3>
-            <div id="individual-totals"></div>
           </div>
         </div>
       </div>
