@@ -482,30 +482,42 @@ document.addEventListener("DOMContentLoaded", function () {
   // Add event delegation for person circles and add-person buttons
   const itemsContainer = document.getElementById("items-container");
   if (itemsContainer) {
-    // Detect if device supports touch
-    const isTouchDevice =
-      "ontouchstart" in window || navigator.maxTouchPoints > 0;
+    // Use click events for all devices - iOS will handle this properly with touch-action: manipulation
+    itemsContainer.addEventListener("click", handleItemInteraction);
 
-    if (isTouchDevice) {
-      // For touch devices, use touchend instead of touchstart to avoid accidental triggers
-      itemsContainer.addEventListener("touchend", handleItemInteraction, {
-        passive: false,
-      });
-    } else {
-      // For non-touch devices, use click
-      itemsContainer.addEventListener("click", handleItemInteraction);
-    }
+    // Add touch event as fallback for immediate feedback on mobile
+    itemsContainer.addEventListener("touchstart", handleTouchStart, {
+      passive: true,
+    });
   }
 });
 
-function handleItemInteraction(event) {
-  // Prevent default behavior
-  event.preventDefault();
+function handleTouchStart(event) {
+  // Add visual feedback for touch - just for immediate response feel
+  const personCircle = event.target.closest(".person-circle");
+  const addPersonBtn = event.target.closest(".add-person");
 
+  if (personCircle || addPersonBtn) {
+    // Add a quick visual feedback class
+    const target = personCircle || addPersonBtn;
+    target.style.transform =
+      target.style.transform.replace(/scale\([^)]*\)/, "") + " scale(0.95)";
+
+    setTimeout(() => {
+      target.style.transform = target.style.transform.replace(
+        /scale\([^)]*\)/,
+        ""
+      );
+    }, 150);
+  }
+}
+
+function handleItemInteraction(event) {
   const personCircle = event.target.closest(".person-circle");
   const addPersonBtn = event.target.closest(".add-person");
 
   if (personCircle) {
+    event.preventDefault();
     const itemIndex = parseInt(personCircle.dataset.itemIndex);
     const personId = parseInt(personCircle.dataset.personId);
 
@@ -513,6 +525,7 @@ function handleItemInteraction(event) {
       assignItem(itemIndex, personId);
     }
   } else if (addPersonBtn) {
+    event.preventDefault();
     addPerson();
   }
 }
