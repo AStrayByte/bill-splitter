@@ -183,13 +183,15 @@ function renderItems() {
                             ? "selected"
                             : ""
                         }" 
-                             onclick="assignItem(${index}, ${person.id})">
+                             data-item-index="${index}" data-person-id="${
+                          person.id
+                        }">
                             ${person.id}
                         </div>
                     `
                       )
                       .join("")}
-                    <div class="add-person" onclick="addPerson()">+</div>
+                    <div class="add-person" data-action="add-person">+</div>
                 </div>
             `;
 
@@ -470,4 +472,46 @@ document.addEventListener("DOMContentLoaded", function () {
   if (toggle) {
     toggle.addEventListener("change", toggleBreakdownDetails);
   }
+
+  // Add event delegation for person circles and add-person buttons
+  const itemsContainer = document.getElementById("items-container");
+  if (itemsContainer) {
+    // Use both click and touchstart for immediate response on mobile
+    itemsContainer.addEventListener("click", handleItemInteraction);
+    itemsContainer.addEventListener("touchstart", handleItemInteraction, {
+      passive: true,
+    });
+  }
 });
+
+function handleItemInteraction(event) {
+  // Prevent double firing on devices that support both touch and click
+  if (event.type === "touchstart" && event.target.dataset.lastTouch) {
+    return;
+  }
+
+  // Mark as touched to prevent click event
+  if (event.type === "touchstart") {
+    event.target.dataset.lastTouch = Date.now();
+    // Clean up after a short delay
+    setTimeout(() => {
+      delete event.target.dataset.lastTouch;
+    }, 500);
+  }
+
+  const personCircle = event.target.closest(".person-circle");
+  const addPersonBtn = event.target.closest(".add-person");
+
+  if (personCircle) {
+    event.preventDefault();
+    const itemIndex = parseInt(personCircle.dataset.itemIndex);
+    const personId = parseInt(personCircle.dataset.personId);
+
+    if (!isNaN(itemIndex) && !isNaN(personId)) {
+      assignItem(itemIndex, personId);
+    }
+  } else if (addPersonBtn) {
+    event.preventDefault();
+    addPerson();
+  }
+}
