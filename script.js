@@ -482,34 +482,29 @@ document.addEventListener("DOMContentLoaded", function () {
   // Add event delegation for person circles and add-person buttons
   const itemsContainer = document.getElementById("items-container");
   if (itemsContainer) {
-    // Use both click and touchstart for immediate response on mobile
-    itemsContainer.addEventListener("click", handleItemInteraction);
-    itemsContainer.addEventListener("touchstart", handleItemInteraction, {
-      passive: true,
-    });
+    // Detect if device supports touch
+    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    
+    if (isTouchDevice) {
+      // For touch devices, use touchend instead of touchstart to avoid accidental triggers
+      itemsContainer.addEventListener("touchend", handleItemInteraction, {
+        passive: false,
+      });
+    } else {
+      // For non-touch devices, use click
+      itemsContainer.addEventListener("click", handleItemInteraction);
+    }
   }
 });
 
 function handleItemInteraction(event) {
-  // Prevent double firing on devices that support both touch and click
-  if (event.type === "touchstart" && event.target.dataset.lastTouch) {
-    return;
-  }
-
-  // Mark as touched to prevent click event
-  if (event.type === "touchstart") {
-    event.target.dataset.lastTouch = Date.now();
-    // Clean up after a short delay
-    setTimeout(() => {
-      delete event.target.dataset.lastTouch;
-    }, 500);
-  }
+  // Prevent default behavior
+  event.preventDefault();
 
   const personCircle = event.target.closest(".person-circle");
   const addPersonBtn = event.target.closest(".add-person");
 
   if (personCircle) {
-    event.preventDefault();
     const itemIndex = parseInt(personCircle.dataset.itemIndex);
     const personId = parseInt(personCircle.dataset.personId);
 
@@ -517,7 +512,6 @@ function handleItemInteraction(event) {
       assignItem(itemIndex, personId);
     }
   } else if (addPersonBtn) {
-    event.preventDefault();
     addPerson();
   }
 }
