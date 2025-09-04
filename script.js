@@ -483,8 +483,9 @@ document.addEventListener("DOMContentLoaded", function () {
   const itemsContainer = document.getElementById("items-container");
   if (itemsContainer) {
     // Detect if device supports touch
-    const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    
+    const isTouchDevice =
+      "ontouchstart" in window || navigator.maxTouchPoints > 0;
+
     if (isTouchDevice) {
       // For touch devices, use touchend instead of touchstart to avoid accidental triggers
       itemsContainer.addEventListener("touchend", handleItemInteraction, {
